@@ -10,54 +10,74 @@
 </head>
 <body>
 <?php
-        function conectar() {
-            $conexion = mysqli_connect("localhost", "root", "", "dblibreria") or die("Problemas con la conexión");
-            return $conexion;
-        }
+function conectar() {
+    $host = "localhost";
+    $dbname = "dblibreria";
+    $user = "root";
+    $password = "";
 
-        function ejecutarConsultaTitulos() {
-            $conexion = conectar();
-            if ($_SERVER["REQUEST_METHOD"] == "POST") {
-                $busqueda = $_POST["busqueda"];
-                $consultat = "SELECT titulos.titulo, titulos.tipo, CONCAT(autores.nombre, ' ', autores.apellido) AS Autor, titulos.id_pub, titulos.precio, titulos.avance, titulos.total_ventas, titulos.notas, titulos.fecha_pub, titulos.contrato, titulo_autor.ord_au, titulo_autor.derechos FROM autores 
+    try {
+        $conexion = new PDO("mysql:host=$host;dbname=$dbname", $user, $password);
+        $conexion->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        return $conexion;
+    } catch (PDOException $e) {
+        die("Problemas con la conexión: " . $e->getMessage());
+    }
+}
+
+function ejecutarConsultaTitulos() {
+    $conexion = conectar();
+
+    if ($_SERVER["REQUEST_METHOD"] == "POST") {
+        $busqueda = $_POST["busqueda"];
+        $consulta = "SELECT titulos.titulo, titulos.tipo, CONCAT(autores.nombre, ' ', autores.apellido) AS Autor, titulos.id_pub, titulos.precio, titulos.avance, titulos.total_ventas, titulos.notas, titulos.fecha_pub, titulos.contrato, titulo_autor.ord_au, titulo_autor.derechos FROM autores 
                                 JOIN titulo_autor ON autores.id_autor = titulo_autor.id_autor 
                                 JOIN titulos ON titulo_autor.id_titulo = titulos.id_titulo
-                                WHERE titulos.titulo LIKE '%$busqueda%'";                         
-                
-            } else {
-                $consultat = "SELECT titulos.titulo, titulos.tipo, CONCAT(autores.nombre, ' ', autores.apellido) AS Autor, titulos.id_pub, titulos.precio, titulos.avance, titulos.total_ventas, titulos.notas, titulos.fecha_pub, titulos.contrato, titulo_autor.ord_au, titulo_autor.derechos FROM autores 
+                                WHERE titulos.titulo LIKE :busqueda";
+
+        $stmt = $conexion->prepare($consulta);
+        $stmt->bindParam(':busqueda', "%$busqueda%", PDO::PARAM_STR);
+    } else {
+        $consulta = "SELECT titulos.titulo, titulos.tipo, CONCAT(autores.nombre, ' ', autores.apellido) AS Autor, titulos.id_pub, titulos.precio, titulos.avance, titulos.total_ventas, titulos.notas, titulos.fecha_pub, titulos.contrato, titulo_autor.ord_au, titulo_autor.derechos FROM autores 
                 JOIN titulo_autor ON autores.id_autor = titulo_autor.id_autor 
-                JOIN titulos ON titulo_autor.id_titulo = titulos.id_titulo; ";
+                JOIN titulos ON titulo_autor.id_titulo = titulos.id_titulo";
+        $stmt = $conexion->prepare($consulta);
+    }
+
+    try {
+        $stmt->execute();
+        $registros = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (count($registros) > 0) {
+            foreach ($registros as $reg) {
+                echo "
+                    <h3>" . $reg['titulo'] . "</h3> 
+                    <div class=\"linea\">
+                    <em class=\"izq\">" . $reg['tipo'] . "</em> 
+                    <em class=\"der\">" . $reg['fecha_pub'] . "</em> </div>
+                    <b>Por " . $reg['Autor'] . "</b>                  
+                    <p>" . $reg['notas'] . "</p>   
+                    <p> <b class=\"b\">ID publicación: </b> " . $reg['id_pub'] .", 
+                    <b class=\"b\">Precio: </b> $". $reg['precio'] .", 
+                    <b class=\"b\">Avance: </b> ". $reg['avance'] .", 
+                    <b class=\"b\">Ventas: </b> ". $reg['total_ventas'] .", 
+                    <b class=\"b\">Contrato: </b> ". $reg['contrato'] ."</p>  
+                ";
+                echo "<hr>";
             }
-            
-            $registros = mysqli_query($conexion, $consultat)or die("Problemas en el select:" . mysqli_error($conexion));
-            if (mysqli_num_rows($registros) > 0) {
-                while ($reg = mysqli_fetch_array($registros)) {
-                    echo "
-                        <h3>" . $reg['titulo'] . "</h3> 
-                        <div class=\"linea\">
-                        <em class=\"izq\">" . $reg['tipo'] . "</em> 
-                        <em class=\"der\">" . $reg['fecha_pub'] . "</em> </div>
-                        <b>Por " . $reg['Autor'] . "</b>                  
-                        <p>" . $reg['notas'] . "</p>   
-                        <p> <b class=\"b\">ID publicación: </b> " . $reg['id_pub'] .", 
-                        <b class=\"b\">Precio: </b> $". $reg['precio'] .", 
-                        <b class=\"b\">Avance: </b> ". $reg['avance'] .", 
-                        <b class=\"b\">Ventas: </b> ". $reg['total_ventas'] .", 
-                        <b class=\"b\">Contrato: </b> ". $reg['contrato'] ."</p>  
-             
-                    ";
-                    echo "<hr>";
-                }
-            } else {
-                echo "<div class='div-selecciona'/>
+        } else {
+            echo "<div class='div-selecciona'/>
                 No se encontraron resultados!! 
               </div>";
-            }          
-            
-            mysqli_close($conexion);
         }
-    ?>
+    } catch (PDOException $e) {
+        die("Problemas en la consulta: " . $e->getMessage());
+    } finally {
+        $conexion = null;
+    }
+}
+?>
+
 
  
      <!--------ENCABEZADO-------->
